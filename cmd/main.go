@@ -1,10 +1,12 @@
 package main
 
 import (
-	"ZakirAvrora/Lab4/src/App"
-	"ZakirAvrora/Lab4/src/Store"
+	"ZakirAvrora/OneLab-lab5/src/App"
+	"ZakirAvrora/OneLab-lab5/src/Store"
+	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
+	_ "github.com/lib/pq"
+	"log"
 )
 
 /*lab4:
@@ -16,13 +18,17 @@ import (
 */
 
 func main() {
+	db, err := sqlx.Open("postgres", "postgres://root:secret@localhost/books_api?sslmode=disable")
+	if err != nil {
+		log.Fatalln(err)
+	}
 
-	store := Store.New("./storage/books.json")
+	store := Store.New(db)
 	app := App.New(store)
 	e := echo.New()
 
-	e.Use(middleware.Logger())
-	e.Use(middleware.Recover())
+	//e.Use(middleware.Logger())
+	//e.Use(middleware.Recover())
 
 	e.GET("/books", app.GetBooks)
 	e.GET("/books/:id", app.GetBookByID)
@@ -30,5 +36,5 @@ func main() {
 	e.PUT("/books/:id", app.UpdateBook)
 	e.DELETE("/books/:id", app.DeleteBook)
 
-	e.Logger.Fatal(e.Start(":8080"))
+	e.Logger.Fatal(e.Start(":8000"))
 }

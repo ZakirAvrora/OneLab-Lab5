@@ -1,155 +1,84 @@
 package Store
 
 import (
-	"ZakirAvrora/Lab4/src/Entity"
-	"ZakirAvrora/Lab4/src/e"
-	"encoding/json"
-	"fmt"
-	"io/ioutil"
-	"os"
-	"sync"
+	"ZakirAvrora/OneLab-lab5/src/Entity"
+	"ZakirAvrora/OneLab-lab5/src/e"
+	"errors"
+	"github.com/jmoiron/sqlx"
+	"time"
 )
 
+var ErrNoRowAffected = errors.New("bad request, no affect in data")
+
 type Store struct {
-	storagePath string
-	mu          sync.Mutex
+	db *sqlx.DB
 }
 
-func New(path string) *Store {
-	return &Store{storagePath: path}
+func New(db *sqlx.DB) *Store {
+	return &Store{db: db}
 }
 
 func (s *Store) GetAllBooks() (books []Entity.Book, err error) {
 	defer func() { err = e.WrapIfErr("can't get all books from store:", err) }()
+	err = s.db.Select(&books, `SELECT * from books`)
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	jsonFile, err := os.Open(s.storagePath)
 	if err != nil {
-		return nil, fmt.Errorf("cannot open json store: %w", err)
+		return nil, err
 	}
-	defer func() { err = jsonFile.Close() }()
-
-	content, err := ioutil.ReadAll(jsonFile)
-	if err != nil {
-		return nil, fmt.Errorf("cannot read the contnet of json store: %w", err)
-	}
-
-	if err = json.Unmarshal(content, &books); err != nil {
-		return nil, fmt.Errorf("cannot unmarshal json file: %w", err)
-	}
-
 	return books, nil
 }
 
 func (s *Store) GetBook(id int) (book Entity.Book, err error) {
 	defer func() { err = e.WrapIfErr("can't get book from store:", err) }()
 
-	books, err := s.GetAllBooks()
+	err = s.db.Get(&book, "SELECT * FROM books WHERE id= $1", id)
 	if err != nil {
-		return book, err
+		return
 	}
-	if id > len(books) || id <= 0 {
-		return book, fmt.Errorf("there no book with such id")
-	}
-	return books[id-1], nil
+	return book, nil
 }
 
 func (s *Store) SaveBook(book Entity.Book) (newBook Entity.Book, err error) {
 	defer func() { err = e.WrapIfErr("can't save book to store:", err) }()
-
-	books, err := s.GetAllBooks()
+	query := `INSERT INTO books (title, author, price)
+			  VALUES (:title, :author, :price)`
+	_, err = s.db.NamedExec(query, book)
 	if err != nil {
-		return newBook, err
-	}
-	bookId := len(books) + 1
-
-	book.Id = bookId
-	books = append(books, book)
-
-	err = s.WriteToFile(books)
-	if err != nil {
-		return newBook, err
+		return Entity.Book{}, err
 	}
 	newBook = book
+
 	return newBook, nil
 }
 
 func (s *Store) DeleteBook(id int) (err error) {
 	defer func() { err = e.WrapIfErr("can't delete book from store:", err) }()
+	result, err := s.db.Exec(`DELETE FROM books WHERE id = $1`, id)
 
-	books, err := s.GetAllBooks()
+	rows, err := result.RowsAffected()
 	if err != nil {
 		return err
 	}
 
-	if id > len(books) || id <= 0 {
-		return fmt.Errorf("id is out of range")
+	if rows == 0 {
+		return ErrNoRowAffected
 	}
-
-	books = remove(books, id-1)
-	err = s.WriteToFile(books)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func (s *Store) UpdateBook(id int, book Entity.Book) (err error) {
 	defer func() { err = e.WrapIfErr("can't update book from store:", err) }()
 
-	books, err := s.GetAllBooks()
+	result, err := s.db.Exec(`UPDATE books SET title = $2, author= $3, price=$4, created_at=$5
+			WHERE id=$1`, id, book.Title, book.Author, book.Price, time.Now())
+
+	rows, err := result.RowsAffected()
 	if err != nil {
 		return err
 	}
 
-	if id > len(books) {
-		return fmt.Errorf("id is out of range")
+	if rows == 0 {
+		return ErrNoRowAffected
 	}
-
-	book.Id = id
-	books[id-1] = book
-	err = s.WriteToFile(books)
-	if err != nil {
-		return err
-	}
-
-	return nil
-
-}
-
-func remove(slice []Entity.Book, s int) []Entity.Book {
-	var newSlice []Entity.Book
-	removed := false
-
-	for i := 0; i < len(slice); i++ {
-		if i == s {
-			removed = true
-			continue
-		}
-
-		if removed {
-			slice[i].Id--
-		}
-		newSlice = append(newSlice, slice[i])
-	}
-
-	return newSlice
-}
-
-func (s *Store) WriteToFile(books []Entity.Book) error {
-	content, err := json.Marshal(books)
-	if err != nil {
-		return err
-	}
-
-	s.mu.Lock()
-	err = os.WriteFile(s.storagePath, content, 0644)
-	s.mu.Unlock()
-
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }

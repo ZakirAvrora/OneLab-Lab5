@@ -1,6 +1,6 @@
 package Repository
 
-import "ZakirAvrora/Lab4/src/Entity"
+import "ZakirAvrora/OneLab-lab5/src/Entity"
 
 type Repository interface {
 	GetAllBooks() ([]Entity.Book, error)

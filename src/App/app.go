@@ -1,8 +1,10 @@
 package App
 
 import (
-	"ZakirAvrora/Lab4/src/Entity"
-	"ZakirAvrora/Lab4/src/Repository"
+	"ZakirAvrora/OneLab-lab5/src/Entity"
+	"ZakirAvrora/OneLab-lab5/src/Repository"
+	"ZakirAvrora/OneLab-lab5/src/Store"
+	"errors"
 	"github.com/labstack/echo/v4"
 	"net/http"
 	"strconv"
@@ -62,9 +64,12 @@ func (app *App) UpdateBook(c echo.Context) error {
 	}
 
 	if err := app.repo.UpdateBook(id, *book); err != nil {
+		if errors.Is(err, Store.ErrNoRowAffected) {
+			return c.String(http.StatusBadRequest, "Bad request, no affect on data")
+		}
 		return err
 	}
-	return c.String(http.StatusNoContent, "Successfully updated")
+	return c.String(http.StatusAccepted, "Successfully updated")
 }
 
 func (app *App) DeleteBook(c echo.Context) error {
@@ -73,8 +78,11 @@ func (app *App) DeleteBook(c echo.Context) error {
 		return c.String(http.StatusBadRequest, "the id parameter must be integer")
 	}
 	if err = app.repo.DeleteBook(id); err != nil {
+		if errors.Is(err, Store.ErrNoRowAffected) {
+			return c.String(http.StatusBadRequest, "Bad request, no affect on data")
+		}
 		return c.String(http.StatusInternalServerError, err.Error())
 	}
 
-	return c.String(http.StatusNoContent, "Successfully deleted")
+	return c.String(http.StatusAccepted, "Successfully deleted")
 }
