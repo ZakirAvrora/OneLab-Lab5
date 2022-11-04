@@ -7,25 +7,28 @@ Simple CRUD server that stores books
 ## Installation
 
 ```bash
-git clone https://github.com/ZakirAvrora/OneLab-Lab4
+git clone https://github.com/ZakirAvrora/OneLab-Lab5
 ```
 
 ## Usage
 
-- To __build__ docker container use command:
+- Firstly to __build__ postgres docker container use command:
 ```bash
-make build
+make postgres:
 ```
 or directly docker commands:
 ```bash
-docker build --rm -t crud-web .
-docker image prune --filter label=stage=builder -f
+docker run --name postgres15 -p 5432:5432 -e POSTGRES_USER=root -e POSTGRES_PASSWORD=secret -d postgres:15-alpine
 ```
-- To __run__ docker container use:
+- Then create database docker_api using:
 ```bash
-make run 
+make createdb 
 ```
 or directly docker command:
 ```bash
-docker run --rm --name crud-web -p 8080:8080 crud-web
+docker exec -it postgres15 createdb --username=root --owner=root books_api
+```
+- Run application on port 8000:
+```bash
+go run ./cmd/main.go
 ```
